@@ -14,7 +14,9 @@ data TimeScale = TimeScale {
                            } deriving (Show, Eq)
 
 data LogicLevel = X | Z | Hi | Lo
--- TODO: need data(s) for holding actual signal values
+data ValChange = ChangeScalar (Tag,  LogicLevel )
+               | ChangeVector (Tag, [LogicLevel])
+type Tag = String
 
 data NodeType   = Wire | Reg deriving (Show, Eq)
 data Signal = Signal {
@@ -38,8 +40,10 @@ data Expr = ModuleExpr Module
           | VersionExpr
           | CommentExpr
           | TimeScaleExpr
+          | EndDefinitionsExpr
           | ValInitExpr
           | ValChangesExpr
+          | TimeStampExpr Int
 
 -- Consume leading whitespace if present
 eatSpaces :: Parser a -> Parser a
@@ -143,4 +147,10 @@ parseModule = do
                 littleModHelper :: [Module] -> ModOrSig -> [Module]
                 littleModHelper acc (Sig _) = acc
                 littleModHelper acc (Mod m) = m:acc
+
+parseEndDefinitions :: Parser Expr
+parseEndDefinitions = do
+                _ <- eatSpaces  $ string "$enddefinitions"
+                _ <- eatSpaces1 $ string "$end"
+                pure EndDefinitionsExpr
 
