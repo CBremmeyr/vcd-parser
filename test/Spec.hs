@@ -18,107 +18,85 @@ main = hspec $ do
   --       }
 
   describe "parseModule" $ do
-    it "something litterly anything" $ do
-        True `shouldBe` True
-    
     it "Parses a module with signals inside" $ do
-      let 
-        actual =
-          parse
-            parseModule
-            ""
-            [r| $scope module myMod $end
+      let actual =
+            parse
+              parseModule
+              ""
+              [r| $scope module myMod $end
                                 $var wire 128 # mySignal $end
                                 $var reg 3 & yourSignal $end
                             $upscope $end |]
-        expected =
-          Right
-            ( Module
-                { modName = "myMod",
-                  signals =
-                    [ Signal
-                        { nodeType = Reg,
-                          size = 3,
-                          symb = "&",
-                          name = "yourSignal"
-                        },
-                      Signal
-                        { nodeType = Wire,
-                          size = 128,
-                          symb = "#",
-                          name = "mySignal"
-                        }
-                    ],
-                  modules = []
-                }
-            )
-        in
-          actual `shouldBe` expected
+          expected =
+            Right
+              ( Module
+                  { modName = "myMod",
+                    signals =
+                      [ Signal
+                          { nodeType = Reg,
+                            size = 3,
+                            symb = "&",
+                            name = "yourSignal"
+                          },
+                        Signal
+                          { nodeType = Wire,
+                            size = 128,
+                            symb = "#",
+                            name = "mySignal"
+                          }
+                      ],
+                    modules = []
+                  }
+              )
+       in actual `shouldBe` expected
 
     it "Parses nested modules with signals inside" $ do
-      let 
-        actual =
-          parse
-            parseModule
-            ""
-            [r| $scope module myMod $end
+      let actual =
+            parse
+              parseModule
+              ""
+              [r| $scope module myMod $end
                                 $var wire 128 # mySignal $end
+
+                                $scope module innerMod $end
+                                  $var reg  9 ^ niner $end
+                                  $var wire 2 ! twoer $end
+                                $upscope $end
                                 $var reg 3 & yourSignal $end
-                            $upscope $end |]
-        expected =
-          Right
-            ( Module
-                { modName = "myMod",
-                  signals =
-                    [ Signal
-                        { nodeType = Reg,
-                          size = 3,
-                          symb = "&",
-                          name = "yourSignal"
-                        },
-                      Signal
-                        { nodeType = Wire,
-                          size = 128,
-                          symb = "#",
-                          name = "mySignal"
-                        }
-                    ],
-                  modules = []
-                }
-            )
-        in
-          actual `shouldBe` expected
-
-          
-
-
-      -- actual `shouldBe` expected
-      --       where
-      --           actual = parse parseModule ""
-      --                     [r| $scope module myMod $end
-      --                           $var wire 128 # mySignal $end
-
-      --                           $scope module innerMod $end
-      --                             $var reg  9 ^ niner $end
-      --                             $var wire 2 ! twoer $end
-      --                           $upscope $end
-      --                           $var reg 3 & yourSignal $end
-      --                         $upscope $end |]
-      --           expected = Right (Module {
-      --                                       modName = "myMod",
-      --                                       signals = [
-      --                                           Signal {
-      --                                                   nodeType = Reg,
-      --                                                   size = 3,
-      --                                                   symb = "&",
-      --                                                   name = "yourSignal"
-      --                                                  },
-      --                                           Signal {
-      --                                                   nodeType = Wire,
-      --                                                   size = 128,
-      --                                                   symb = "#",
-      --                                                   name = "mySignal"
-      --                                                   }
-      --                                                  ],
-      --                                           modules = []
-      --                                     })
+                              $upscope $end |]
+          expected =
+            Right
+              ( Module
+                  { modName = "myMod",
+                    signals =
+                      [ Signal
+                          { nodeType = Reg,
+                            size = 3,
+                            symb = "&",
+                            name = "yourSignal"
+                          },
+                        Signal {nodeType = Wire, size = 128, symb = "#", name = "mySignal"}
+                      ],
+                    modules =
+                      [ Module
+                          { modName = "innerMod",
+                            signals =
+                              [ Signal
+                                  { nodeType = Wire,
+                                    size = 2,
+                                    symb = "!",
+                                    name = "twoer"
+                                  },
+                                Signal
+                                  { nodeType = Reg,
+                                    size = 9,
+                                    symb = "^",
+                                    name = "niner"
+                                  }
+                              ],
+                            modules = []
+                          }
+                      ]
+                  }
+              )
+       in actual `shouldBe` expected
