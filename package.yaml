@@ -23,6 +23,7 @@ dependencies:
 - base >= 4.7 && < 5
 - parsec >= 3.1.14 && < 4
 - hspec >= 2.0 && < 3
+- raw-strings-qq >= 1.1
 
 library:
   source-dirs: src

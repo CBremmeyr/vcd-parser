@@ -7,27 +7,31 @@ import Data.Char
 someFunc :: IO ()
 someFunc = putStrLn "someFunc"
 
-data TimeUnit = S | MS | US | NS | PS | FS deriving Show
+data TimeUnit = S | MS | US | NS | PS | FS deriving (Show, Eq)
 data TimeScale = TimeScale {
                             val  :: Int,
                             unit :: TimeUnit
-                           } deriving Show
+                           } deriving (Show, Eq)
 
 data LogicLevel = X | Z | Hi | Lo
 -- TODO: need data(s) for holding actual signal values
 
-data NodeType   = Wire | Reg deriving Show
+data NodeType   = Wire | Reg deriving (Show, Eq)
 data Signal = Signal {
                         nodeType :: NodeType,
                         size :: Int,
                         symb :: String,
                         name :: String
-                     } deriving Show
+                     } deriving (Show, Eq)
 
 data Module = Module {
+                       modName :: String,
                        signals :: [Signal],
                        modules :: [Module]
-                     }
+                     } deriving (Show, Eq)
+
+data ModOrSig = Sig Signal
+              | Mod Module
 
 data Expr = ModuleExpr Module
           | DateExpr
@@ -58,7 +62,6 @@ parseInt = read <$> (many1 digit)
 
 -- Gets chars upto next whitespace
 parseWord :: Parser String
---parseWord = manyTill anyChar (try space)
 parseWord = manyTill anyChar (lookAhead space)
 
 parseSignal :: Parser Signal 
@@ -89,6 +92,11 @@ parseTimeScale = do
             _ <- eatSpaces  $ string "$timescale"
             v <- eatSpaces1 parseInt
             u <- eatSpaces  parseTimeUnit
+            _ <- eatSpaces1 $ string "$end"
+            pure $ TimeScale {
+                                val  = v,
+                                unit = u
+                             }
                  where
                     parseTimeUnit =  (const S  <$> (string "s" ))
                                  <|> (const MS <$> (string "ms"))
@@ -96,9 +104,43 @@ parseTimeScale = do
                                  <|> (const NS <$> (string "ns"))
                                  <|> (const PS <$> (string "ps"))
                                  <|> (const FS <$> (string "fs"))
-            _ <- eatSpaces1 $ string "$end"
-            pure $ TimeScale {
-                                val  = v,
-                                unit = u
-                             }
+
+-- data ModOrSig = Sig Signal
+--               | Mod Module
+parseModOrSig :: Parser ModOrSig
+parseModOrSig =  (Sig <$> (try parseSignal))
+             <|> (Mod <$> (try parseModule))
+
+-- data Module = Module {
+--                        signals :: [Signal],
+--                        modules :: [Module]
+--                      }
+parseModule :: Parser Module
+parseModule = do
+        _ <- eatSpaces  $ string "$scope"
+        _ <- eatSpaces1 $ string "module"
+        n <- eatSpaces1 $ parseWord
+        _ <- eatSpaces1 $ string "$end"
+        x <- many1 parseModOrSig
+        _ <- eatSpaces1 $ string "$upscope"
+        _ <- eatSpaces1 $ string "$end"
+        pure $ Module {
+                      modName = n,
+                      signals = extractSig x,
+                      modules = extractMod x
+                      }
+            where
+                extractSig :: [ModOrSig] -> [Signal]
+                extractSig x = foldl littleSigHelper [] x
+
+                extractMod :: [ModOrSig] -> [Module]
+                extractMod x = foldl littleModHelper [] x
+
+                littleSigHelper :: [Signal] -> ModOrSig -> [Signal]
+                littleSigHelper acc (Sig s) = s:acc
+                littleSigHelper acc (Mod _) = acc
+
+                littleModHelper :: [Module] -> ModOrSig -> [Module]
+                littleModHelper acc (Sig _) = acc
+                littleModHelper acc (Mod m) = m:acc
 
