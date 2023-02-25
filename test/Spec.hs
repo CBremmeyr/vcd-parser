@@ -1,5 +1,6 @@
 {-# LANGUAGE QuasiQuotes #-}
 
+import Data.Either
 import Lib
 import Test.Hspec
 import Text.ParserCombinators.Parsec
@@ -7,6 +8,59 @@ import Text.RawString.QQ
 
 main :: IO ()
 main = hspec $ do
+  -- parseValInit :: Parser [Expr]
+  describe "parseValInit" $ do
+    it "Parses inital value block" $ do
+      parse
+        parseValInit
+        ""
+        [r| $dumpvars
+            bxxxxxxxx #
+            x$
+            0%
+            x&
+            x'
+            1(
+            0)
+            $end
+        |]
+        `shouldBe` ( Right
+                       [ ValChangeExpr (ChangeVector ("#", [X, X, X, X, X, X, X, X])),
+                         ValChangeExpr (ChangeScalar ("$", X)),
+                         ValChangeExpr (ChangeScalar ("%", Lo)),
+                         ValChangeExpr (ChangeScalar ("&", X)),
+                         ValChangeExpr (ChangeScalar ("'", X)),
+                         ValChangeExpr (ChangeScalar ("(", Hi)),
+                         ValChangeExpr (ChangeScalar (")", Lo))
+                       ]
+                   )
+
+  describe "parseScalarLogicLevel" $ do
+    it "Parses scalar of logic level 0" $ do
+      parse parseScalarLogicLevel "" " 0 %"
+        `shouldBe` Right
+          (ChangeScalar ("%", Lo))
+    it "Parses scalar of logic level 1" $ do
+      parse parseScalarLogicLevel "" " 1 ^"
+        `shouldBe` Right
+          (ChangeScalar ("^", Hi))
+
+  describe "parseVecLogicLevel" $ do
+    it "Parses vector of logic levels" $ do
+      parse parseVecLogicLevel "" " b01zZxX10 )"
+        `shouldBe` Right
+          (ChangeVector (")", [Lo, Hi, Z, Z, X, X, Hi, Lo]))
+
+  describe "parseLogicLevel" $ do
+    it "Parses logic level char" $ do
+      parse parseLogicLevel "" "0" `shouldBe` Right Lo
+      parse parseLogicLevel "" "1" `shouldBe` Right Hi
+      parse parseLogicLevel "" "x" `shouldBe` Right X
+      parse parseLogicLevel "" "X" `shouldBe` Right X
+      parse parseLogicLevel "" "z" `shouldBe` Right Z
+      parse parseLogicLevel "" "Z" `shouldBe` Right Z
+      parse parseLogicLevel "" "2" `shouldSatisfy` isLeft
+
   describe "parseSignal" $ do
     it "Parses signals" $ do
       parse parseSignal "" "$var wire 8 # data $end"
