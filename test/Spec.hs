@@ -8,7 +8,100 @@ import Text.RawString.QQ
 
 main :: IO ()
 main = hspec $ do
-  -- parseValInit :: Parser [Expr]
+  
+  describe "parseExpr" $ do
+    it "Parses entire VCD file" $ do
+      parse parseExpr "" 
+        [r|
+          $date
+             Date text. For example: November 11, 2009.
+          $end
+          $version
+             VCD generator tool version info text.
+          $end
+          $comment
+             Any comment text.
+          $end
+          $timescale 1ps $end
+          $scope module logic $end
+          $var wire 8 # data $end
+          $var wire 1 $ data_valid $end
+          $var wire 1 % en $end
+          $var wire 1 & rx_en $end
+          $var wire 1 ' tx_en $end
+          $var wire 1 ( empty $end
+          $var wire 1 ) underrun $end
+          $upscope $end
+          $enddefinitions $end
+          $dumpvars
+          bxxxxxxxx #
+          x$
+          0%
+          x&
+          x'
+          1(
+          0)
+          $end
+          #0
+          b10000001 #
+          0$
+          1%
+          0&
+          1'
+          0(
+          0)
+          #2211
+          0'
+          #2296
+          b0 #
+          1$
+          #2302
+          0$
+          #2303
+        |]
+         `shouldBe` (Right $
+          [
+            DateExpr "\n             Date text. For example: November 11, 2009.\n          ",
+            VersionExpr "\n             VCD generator tool version info text.\n          ",
+            CommentExpr "\n             Any comment text.\n          ",
+            TimeScaleExpr (TimeScale {val = 1, unit = PS}),
+            ModuleExpr (Module {modName = "logic",
+                                signals = [Signal {nodeType = Wire, size = 1, symb = ")", name = "underrun"},
+                                           Signal {nodeType = Wire, size = 1, symb = "(", name = "empty"},
+                                           Signal {nodeType = Wire, size = 1, symb = "'", name = "tx_en"},
+                                           Signal {nodeType = Wire, size = 1, symb = "&", name = "rx_en"},
+                                           Signal {nodeType = Wire, size = 1, symb = "%", name = "en"},
+                                           Signal {nodeType = Wire, size = 1, symb = "$", name = "data_valid"},
+                                           Signal {nodeType = Wire, size = 8, symb = "#", name = "data"}],
+                                modules = []}),
+            EndDefinitionsExpr,
+            ValInitExpr [ChangeVector ("#",[X,X,X,X,X,X,X,X]),
+                         ChangeScalar ("$",X),
+                         ChangeScalar ("%",Lo),
+                         ChangeScalar ("&",X),
+                         ChangeScalar ("'",X),
+                         ChangeScalar ("(",Hi),
+                         ChangeScalar (")",Lo)],
+            TimeChangeExpr 0,
+            ValChangeExpr (ChangeVector ("#",[Hi,Lo,Lo,Lo,Lo,Lo,Lo,Hi])),
+            ValChangeExpr (ChangeScalar ("$",Lo)),
+            ValChangeExpr (ChangeScalar ("%",Hi)),
+            ValChangeExpr (ChangeScalar ("&",Lo)),
+            ValChangeExpr (ChangeScalar ("'",Hi)),
+            ValChangeExpr (ChangeScalar ("(",Lo)),
+            ValChangeExpr (ChangeScalar (")",Lo)),
+            TimeChangeExpr 2211,
+            ValChangeExpr (ChangeScalar ("'",Lo)),
+            TimeChangeExpr 2296,
+            ValChangeExpr (ChangeVector ("#",[Lo])),
+            ValChangeExpr (ChangeScalar ("$",Hi)),
+            TimeChangeExpr 2302,
+            ValChangeExpr (ChangeScalar ("$",Lo)),
+            TimeChangeExpr 2303
+          ]
+         )
+         
+  
   describe "parseValInit" $ do
     it "Parses inital value block" $ do
       parse
@@ -24,14 +117,15 @@ main = hspec $ do
             0)
             $end
         |]
-        `shouldBe` ( Right
-                       [ ValChangeExpr (ChangeVector ("#", [X, X, X, X, X, X, X, X])),
-                         ValChangeExpr (ChangeScalar ("$", X)),
-                         ValChangeExpr (ChangeScalar ("%", Lo)),
-                         ValChangeExpr (ChangeScalar ("&", X)),
-                         ValChangeExpr (ChangeScalar ("'", X)),
-                         ValChangeExpr (ChangeScalar ("(", Hi)),
-                         ValChangeExpr (ChangeScalar (")", Lo))
+        `shouldBe` ( Right $
+                        ValInitExpr [
+                          (ChangeVector ("#", [X, X, X, X, X, X, X, X])),
+                          (ChangeScalar ("$", X)),
+                          (ChangeScalar ("%", Lo)),
+                          (ChangeScalar ("&", X)),
+                          (ChangeScalar ("'", X)),
+                          (ChangeScalar ("(", Hi)),
+                          (ChangeScalar (")", Lo))
                        ]
                    )
 

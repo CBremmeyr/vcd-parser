@@ -1,7 +1,6 @@
-{-# LANGUAGE MultiWayIf #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-
 {-# HLINT ignore "Use <$>" #-}
+
 module Lib where
 
 import Data.Char
@@ -52,10 +51,10 @@ data ModOrSig
 
 data Expr
   = ModuleExpr Module
-  | DateExpr
-  | VersionExpr
-  | CommentExpr
-  | TimeScaleExpr
+  | DateExpr String
+  | VersionExpr String
+  | CommentExpr String
+  | TimeScaleExpr TimeScale
   | EndDefinitionsExpr
   | ValInitExpr [ValChange]
   | ValChangeExpr ValChange
@@ -93,12 +92,9 @@ parseTag = do parseWord
 -- Get string between `$sectionTag` and `$end`
 -- use to parse $date, $version, and $comment sections
 parseTextSection :: String -> Parser String
-parseTextSection sectionTag =
-  eatSpaces $
-    between
-      (string ('$' : sectionTag))
-      (string "$end")
-      (many1 anyChar)
+parseTextSection sectionTag = do
+  _ <- eatSpaces $ string ('$' : sectionTag)
+  manyTill anyChar (string "$end")
 
 -- Get timescale value and units
 -- between `$timescale` and `$end`
@@ -175,20 +171,20 @@ parseModule = do
 
 parseEndDefinitions :: Parser Expr
 parseEndDefinitions = do
-  _ <- eatSpaces $ string "$enddefinitions"
+  _ <- eatSpaces  $ string "$enddefinitions"
   _ <- eatSpaces1 $ string "$end"
   pure EndDefinitionsExpr
 
 -- Parse out `$dumpvars` and initial values for signals and `$end`
-parseValInit :: Parser [Expr]
+parseValInit :: Parser Expr
 parseValInit = do
   _        <- eatSpaces1 $ string "$dumpvars"
-  initVals <- many initValsHelper
+  initVals <- initValsHelper
   _        <- eatSpaces1 $ string "$end"
   return initVals
   where
     initValsHelper :: Parser Expr
-    initValsHelper = ValChangeExpr <$> parseValChange
+    initValsHelper = ValInitExpr <$> many parseValChange
 
 parseValChange :: Parser ValChange
 parseValChange = try parseVecLogicLevel <|> try parseScalarLogicLevel
@@ -217,3 +213,32 @@ parseLogicLevel =
     <|> (char 'X') *> pure X
     <|> (char 'z') *> pure Z
     <|> (char 'Z') *> pure Z
+
+-- Parse time change
+parseTimeChange :: Parser Expr
+parseTimeChange = do
+  _ <- eatSpaces1 $ try $ char '#'
+  i <- parseInt
+  pure $ TimeChangeExpr i
+  
+-- Parse entire VCD file
+parseExpr :: Parser [Expr]
+parseExpr = many1 (
+      (try parseTimeScaleExpr <?> "time scale")
+  <|> (try parseModuleExpr <?> "0")
+  <|> (try parseValInit <?> "1")
+  <|> (try parseTimeChange <?> "2")
+  <|> (try parseValChangeExpr <?> "3")
+  <|> (try parseEndDefinitions <?> "4")
+  <|> (try parseDateExpr <?> "5")
+  <|> (try parseVersionExpr <?> "6")
+  <|> (try parseCommentExpr <?> "7")
+  )
+  where
+    parseTimeScaleExpr :: Parser Expr
+    parseTimeScaleExpr = TimeScaleExpr <$> parseTimeScale
+    parseModuleExpr    = ModuleExpr    <$> parseModule
+    parseValChangeExpr = ValChangeExpr <$> parseValChange
+    parseDateExpr      = DateExpr      <$> parseTextSection "date"
+    parseVersionExpr   = VersionExpr   <$> parseTextSection "version"
+    parseCommentExpr   = CommentExpr   <$> parseTextSection "comment"
